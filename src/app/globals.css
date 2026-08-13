@@ -1,0 +1,471 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Green-phosphor terminal palette ─────────────────────────────── */
+  --color-page: #02110a;
+  --color-card: #042312;
+  --color-line: #0c3b1d;
+  --color-line-strong: #16603a;
+
+  /* Phosphor ink — the single text green, plus its dims/brights. */
+  --color-term: #3dff6b;
+  --color-term-dim: #1c8a43;
+  --color-term-faint: #0f5a2b;
+  --color-term-bright: #a5ffc2;
+  --color-term-amber: #ffc857;
+  --color-term-red: #ff6b6b;
+  --color-term-cyan: #66ffcc;
+
+  /* Every font-mono utility uses the loaded JetBrains Mono face. */
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular,
+    Menlo, Consolas, monospace;
+}
+
+/* Arabic signature font (the footer's maker mark). */
+@utility font-aref-ruqaa {
+  font-family: var(--font-aref-ruqaa), "Aref Ruqaa", serif;
+}
+
+/* The Arabic logo wordmark — Cairo. */
+@utility font-cairo {
+  font-family: var(--font-cairo), "Cairo", sans-serif;
+}
+
+/* Urdu/Arabic footer line. */
+@utility font-reem-kufi {
+  font-family: var(--font-reem-kufi), "Reem Kufi", "Reem Kufi Arabic",
+    sans-serif;
+}
+
+:root {
+  /* Native controls (date pickers, checkboxes, selects) render dark. */
+  color-scheme: dark;
+  /* Editor line-height (per-entry override wins; else the global default). */
+  --editor-line-height: 1.5;
+}
+
+html {
+  background: var(--color-page);
+}
+
+body {
+  background: transparent;
+  color: var(--color-term);
+  font-family: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo,
+    Consolas, monospace;
+  overscroll-behavior-y: none;
+}
+
+html {
+  scroll-padding-top: 4rem;
+}
+
+/* No visible scrollbars. */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Respect reduced-motion preferences. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin,
+  .term-cursor,
+  .home-row.is-removing {
+    animation: none !important;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+::selection {
+  background: var(--color-term);
+  color: var(--color-page);
+}
+
+/* Terminal-style focus: green hairline ring on keyboard focus only. */
+:focus {
+  outline: none;
+}
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[role="menuitem"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 1px solid var(--color-term);
+  outline-offset: 1px;
+}
+
+/* ── The terminal screen ──────────────────────────────────────────── */
+.term-screen {
+  /* One base size for every terminal screen; utilities override it. */
+  font-size: 0.875rem;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      rgba(61, 255, 107, 0.018) 0px,
+      rgba(61, 255, 107, 0.018) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    radial-gradient(
+      ellipse at center,
+      rgba(0, 0, 0, 0) 55%,
+      rgba(0, 0, 0, 0.45) 100%
+    ),
+    linear-gradient(rgba(2, 17, 10, 0.88), rgba(2, 17, 10, 0.88));
+}
+
+/* Faint phosphor glow for the biggest headlines only. */
+.term-glow {
+  text-shadow: 0 0 8px rgba(61, 255, 107, 0.45);
+}
+
+/* Blinking block cursor used by prompts / boot line. */
+.term-cursor {
+  display: inline-block;
+  width: 0.6em;
+  height: 1.05em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--color-term);
+  animation: term-blink 1.06s steps(1) infinite;
+}
+
+@keyframes term-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Reverse-video row — the "current line" of the home list. */
+.term-rev {
+  background: var(--color-term);
+  color: var(--color-page);
+}
+
+/* Component classes live in a layer so Tailwind utilities (hidden,
+   inline-flex, px-0!, …) can override them. */
+@layer components {
+  /* ── Home list rows ─────────────────────────────────────────────── */
+  /* A character grid (ch columns) like a real `ls -la`, so every row's
+     columns sit on the same monospace column — pixel flex gaps can't do
+     that. Number + 8-digit id, then the title fills the leading space,
+     and the date pins to the right edge. */
+  .home-row {
+    display: grid;
+    grid-template-columns: 3ch 8ch minmax(0, 1fr) 12ch;
+    column-gap: 1ch;
+    align-items: center;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    overflow: hidden;
+    cursor: pointer;
+    border-bottom: 1px solid var(--color-line);
+    max-height: 3rem;
+  }
+  .home-row:last-child {
+    border-bottom: none;
+  }
+  .home-row .dim {
+    color: var(--color-term-dim);
+  }
+  .home-row.is-cursor {
+    background: var(--color-term);
+    color: var(--color-page);
+  }
+  .home-row.is-cursor .dim,
+  .home-row.is-cursor .date,
+  .home-row.is-cursor .size {
+    color: var(--color-page) !important;
+    opacity: 0.75;
+  }
+  .home-row .row-title {
+    color: var(--color-term-bright);
+  }
+  .home-row.is-cursor .row-title {
+    color: var(--color-page);
+  }
+
+  /* ── Row removal animation ──────────────────────────────────────── */
+  /* The base max-height makes the collapse animatable; the row itself is
+     one line (~2.2rem), so 3rem never clips it. */
+  .home-row.is-removing {
+    pointer-events: none;
+    animation: remove-entry 0.32s ease-in forwards;
+  }
+
+  @keyframes remove-entry {
+    to {
+      opacity: 0;
+      transform: translateX(-12px);
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      border-bottom-width: 0;
+    }
+  }
+
+  /* ── Status line (vim-style) ────────────────────────────────────── */
+  .statusline {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 1rem;
+    padding: 0.05rem 0.6rem;
+    background: var(--color-card);
+    border-top: 1px solid var(--color-line-strong);
+    color: var(--color-term-dim);
+    font-size: 0.7rem;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .statusline .mode {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 0.45rem;
+    background: var(--color-term);
+    color: var(--color-page);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .statusline .mode.insert {
+    background: var(--color-term-cyan);
+  }
+  .statusline .mode.visual {
+    background: var(--color-term-amber);
+  }
+  .statusline .mode.replace {
+    background: var(--color-term-red);
+  }
+  .statusline .mode.grep,
+  .statusline .mode.command {
+    background: var(--color-term-bright);
+  }
+  .statusline .sp {
+    flex: 1;
+  }
+
+  /* ── Buttons / inputs ───────────────────────────────────────────── */
+  .term-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    height: 1.7rem;
+    padding: 0 0.6rem;
+    border: 1px solid var(--color-line-strong);
+    background: transparent;
+    color: var(--color-term);
+    font-size: 0.72rem;
+    font-family: inherit;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition:
+      background-color 0.12s ease,
+      border-color 0.12s ease,
+      color 0.12s ease,
+      transform 0.12s ease;
+  }
+  .term-btn:hover {
+    border-color: var(--color-term);
+    background: rgba(61, 255, 107, 0.08);
+  }
+  .term-btn:active {
+    transform: translateY(1px);
+  }
+  .term-btn:disabled {
+    opacity: 0.45;
+    cursor: wait;
+  }
+  .term-btn.solid {
+    background: var(--color-term);
+    border-color: var(--color-term);
+    color: var(--color-page);
+    font-weight: 700;
+  }
+  .term-btn.solid:hover {
+    background: var(--color-term-bright);
+    border-color: var(--color-term-bright);
+  }
+  .term-btn.danger:hover {
+    border-color: var(--color-term-red);
+    color: var(--color-term-red);
+    background: rgba(255, 107, 107, 0.08);
+  }
+
+  .term-input {
+    height: 1.7rem;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-page);
+    padding: 0 0.5rem;
+    color: var(--color-term-bright);
+    font-size: 0.75rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.12s ease;
+  }
+  .term-input:focus {
+    border-color: var(--color-term);
+  }
+  .term-input::placeholder {
+    color: var(--color-term-faint);
+  }
+
+  .term-select {
+    height: 1.7rem;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-page);
+    color: var(--color-term);
+    font-size: 0.72rem;
+    font-family: inherit;
+    outline: none;
+  }
+  .term-select:focus {
+    border-color: var(--color-term);
+  }
+
+  /* ── Dialogs (terminal look) ────────────────────────────────────── */
+  .term-dialog {
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-card);
+    box-shadow:
+      0 0 0 1px rgba(61, 255, 107, 0.12),
+      0 24px 60px rgba(0, 0, 0, 0.7);
+  }
+  .term-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--color-line);
+    color: var(--color-term-dim);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+}
+
+/* ── CodeMirror (the vim editor) ──────────────────────────────────── */
+/* Display prefs (editor toolbar) land on the buffer wrapper as CSS vars:
+   --editor-font-size, --editor-bg, --editor-fg — the editor inherits them
+   with terminal defaults as fallbacks. */
+.cm-editor {
+  height: 100%;
+  background: var(--editor-bg, transparent);
+  color: var(--editor-fg, var(--color-term));
+  font-size: var(--editor-font-size, 0.875rem);
+}
+.cm-editor.cm-focused {
+  outline: none;
+}
+.cm-scroller {
+  font-family: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular,
+    Menlo, Consolas, monospace;
+  line-height: var(--editor-line-height, 1.75);
+  overflow: auto;
+  scrollbar-width: none;
+}
+.cm-scroller::-webkit-scrollbar {
+  display: none;
+}
+.cm-content {
+  font-family: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular,
+    Menlo, Consolas, monospace;
+  /* The caret must be a bright green block, like a real terminal. The
+     !important beats CodeMirror's injected theme ("light .cm-content" →
+     caret-color: black), which would otherwise render the caret invisible
+     on this dark phosphor screen. caret-shape: block (Chrome 125+) turns
+     the native caret into a true block; older browsers fall back to a
+     clearly visible green bar. */
+  /* caret-shape: bar → the insert-mode caret is a thin vertical bar,
+     like real vim. Normal/visual mode swap to the plugin's full block
+     (.cm-fat-cursor) and replace to its underline, so the cursor's
+     thickness now tracks the mode. */
+  caret-color: var(--editor-fg, var(--color-term)) !important;
+  caret-shape: bar;
+  /* Page-like margins INSIDE the buffer (MS-Word style): the text is inset
+     from the frame's edges on all sides, with room to breathe top and
+     bottom. The line padding below supplies the horizontal margins.
+     !important beats CodeMirror's runtime-injected base theme
+     (which sets .cm-content padding 4px 0 / .cm-line 0 2px 0 6px), the
+     same reason the caret-color rule above needs it. */
+  padding: 2.5rem 0 3.5rem !important;
+}
+.cm-line {
+  /* Left margin is smaller because the line-number gutter sits there;
+     the right margin is the full page margin. */
+  padding: 0 3rem 0 1.75rem !important;
+}
+.cm-gutters {
+  background: var(--editor-bg, var(--color-page));
+  color: var(--color-term-faint);
+  border-right: 1px solid var(--color-line);
+  /* Line numbers share the text size — a real vim gutter. */
+}
+.cm-activeLine {
+  background: rgba(61, 255, 107, 0.05);
+}
+.cm-activeLineGutter {
+  background: rgba(61, 255, 107, 0.08);
+  color: var(--color-term-dim);
+}
+.cm-selectionBackground,
+.cm-focused .cm-selectionBackground {
+  /* Solid terminal reverse-video selection — the color follows the editor's
+     highlight pick (--editor-hl). The selection layer paints behind the
+     text, so the glyphs keep their own color below; `.cm-line ::selection`
+     re-colors them dark to complete the look. */
+  background: var(--editor-hl, var(--color-term)) !important;
+  color: var(--color-page) !important;
+}
+.cm-content ::selection,
+.cm-vimMode .cm-line ::selection,
+.cm-vimMode .cm-line::selection,
+.cm-editor .cm-line ::selection,
+.cm-editor .cm-line::selection {
+  background: var(--editor-hl, var(--color-term)) !important;
+  color: var(--color-page) !important;
+}
+.cm-cursor {
+  border-left-color: var(--editor-fg, var(--color-term)) !important;
+}
+/* Vim's block cursor (normal/visual modes) — follows the chosen font color. */
+.cm-fat-cursor {
+  background: var(--editor-fg, var(--color-term)) !important;
+  border: none !important;
+  color: var(--editor-bg, var(--color-page)) !important;
+}
+.cm-vim-panel {
+  background: var(--color-page) !important;
+  color: var(--color-term) !important;
+  border-top: 1px solid var(--color-line-strong) !important;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace !important;
+  min-height: 1.5rem;
+  padding: 0 0.6rem !important;
+}
+.cm-vim-panel input {
+  color: var(--color-term-bright) !important;
+  font-family: inherit;
+}
+.cm-searchMatch {
+  background: rgba(255, 200, 87, 0.35) !important;
+  outline: none;
+}
