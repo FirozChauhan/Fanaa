@@ -1,3 +1,6 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { spawn } from "node:child_process";
 import type { Writable } from "node:stream";
 
@@ -7,6 +10,20 @@ function passphrase(): string {
     throw new Error("ENC_PASSPHRASE is not set. Add it to your .env file.");
   }
   return p;
+}
+
+/**
+ * A writable, empty gpg home directory.
+ *
+ * gpg needs a home dir for lock files even for pure symmetric operations. On
+ * serverless hosts (Vercel) HOME can point at a non-existent path and the
+ * filesystem is read-only except /tmp, so gpg dies with `can't create
+ * directory '$HOME/.gnupg'`. Creating a scratch home under the OS temp dir
+ * sidesteps that everywhere (local, Render, Vercel) — no keyring is needed
+ * for --symmetric, so the dir can be empty.
+ */
+function scratchGnupgHome(): string {
+  return mkdtempSync(join(tmpdir(), "fanaa-gnupg-"));
 }
 
 /**
@@ -26,6 +43,8 @@ function runGpg(args: string[], input: Buffer | string): Promise<Buffer> {
         "loopback",
         "--passphrase-fd",
         "3",
+        "--homedir",
+        scratchGnupgHome(),
         ...args,
       ],
       { stdio: ["pipe", "pipe", "pipe", "pipe"] },
