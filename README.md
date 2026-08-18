@@ -39,7 +39,7 @@ flowchart LR
   C --> E[r2.ts<br/>client + read cache]
   D --> E
   E --> F[(Cloudflare R2<br/>.gpg blobs + index.json)]
-  F -.index.json.-> C
+  F -.->|index.json| C
 ```
 
 Saving a page runs Vim buffer → `PUT /api/pages/[slug]` → `updatePage` → gpg encrypt → R2; the home list renders straight from the plaintext `index.json`, so browsing and stats never decrypt a single entry.
