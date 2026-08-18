@@ -1,170 +1,127 @@
 # Fanaa
 
-> A private, vim-operated journal that encrypts every page locally with gpg AES-256 before it ever reaches Cloudflare R2.
+> A private journal that behaves like a terminal.
 
-![Next.js 16](https://img.shields.io/badge/Next.js%2016-black?style=flat-square&logo=nextdotjs&logoColor=white)
-![React 19](https://img.shields.io/badge/React%2019-61DAFB?style=flat-square&logo=react&logoColor=black)
-![TypeScript 5](https://img.shields.io/badge/TypeScript%205-3178C6?style=flat-square&logo=typescript&logoColor=white)
-![Tailwind CSS 4](https://img.shields.io/badge/Tailwind%20CSS%204-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
-![Cloudflare R2](https://img.shields.io/badge/Cloudflare%20R2-F38020?style=flat-square&logo=cloudflare&logoColor=white)
-![gpg AES-256](https://img.shields.io/badge/gpg%20AES--256-9C3D00?style=flat-square&logo=gnuprivacyguard&logoColor=white)
-![CodeMirror + Vim](https://img.shields.io/badge/CodeMirror%20%2B%20Vim-019733?style=flat-square&logo=vim&logoColor=white)
-![Arabic / Urdu UI](https://img.shields.io/badge/Arabic%20%2F%20Urdu%20typography-E35F5F?style=flat-square)
+![Next.js](https://img.shields.io/badge/Next.js_16-000000?style=flat-square&logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=000)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![Tailwind](https://img.shields.io/badge/Tailwind_4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![Cloudflare R2](https://img.shields.io/badge/Cloudflare_R2-F38020?style=flat-square&logo=cloudflare&logoColor=white)
+![Vim](https://img.shields.io/badge/Vim-019733?style=flat-square&logo=vim&logoColor=white)
+![CodeMirror](https://img.shields.io/badge/CodeMirror_6-4a9eff?style=flat-square)
+![AES-256](https://img.shields.io/badge/AES--256-3dff6b?style=flat-square)
+![Local S3 mock -optional](https://img.shields.io/badge/Local_S3_mock-optional-555555?style=flat-square)
 
 ---
 
 ## Why this project exists
 
-Public cloud storage is convenient, but a journal's words should only exist in plaintext for the person who wrote them. Fanaa turns any browser into a terminal where every entry is encrypted on the server with `gpg --symmetric AES-256` before a single byte is written to an S3-compatible bucket. The engineering is interesting because the encryption runs on ephemeral, read-only-filesystem hosts — gpg is spawned as a subprocess with a scratch home directory — while listing, stats, and streaks work off a small plaintext index that never contains the actual words.
+Cloud journals are only as private as the vendor that stores them. Fanaa encrypts every entry before it ever leaves the server and dresses the whole journal as a terminal — vim keys, grep, `cal`, a shell prompt — so privacy lives in the storage layer, not in trust of anyone else.
 
 ## What it does
 
-- **True vim over the wire** — real vim keybindings (registers, visual modes, macros) via CodeMirror + `@replit/codemirror-vim`, plus working ex commands `:w`, `:q`, `:wq`, `:q!` (`src/components/VimEditor.tsx:227`).
-- **Encrypted before it means anything to anyone else** — every save runs `gpg --symmetric --cipher-algo AES256` on the server, so the bucket only ever holds ciphertext (`src/lib/crypto.ts:81`).
-- **Autosave that is hard to lose to** — changes are written ~0.9s after the last keystroke (`src/components/VimEditor.tsx:31`), again on tab-hide/unload (`:270`), and failed saves retry every 3 seconds (`:141`).
-- **A journal that locks like a phone** — optional salted-scrypt PIN (4–64 chars enforced at `src/lib/lock.ts:19`), verified server-side in constant time (`src/lib/lock.ts:87`); 5 wrong tries lock the endpoint for 15s (`src/app/api/lock/verify/route.ts:10`).
-- **Optional session gate** — setting `APP_HASH_KEY` turns on a full-app key prompt backed by an httpOnly HMAC session cookie (`src/lib/auth.ts:48`) with the same 5-tries / 15s throttle (`src/app/api/auth/login/route.ts:15`).
-- **grep your whole journal** — full-text search decrypts every entry four at a time (`src/lib/pages.ts:252`) and returns a snippet around the first match, falling back to the first line for title-only hits (`src/lib/pages.ts:289`).
-- **A Unix calendar** — `cal`-style month grid navigated with h/j/k/l that opens a day's entry or creates a new one dated for the selected day (`src/components/Calendar.tsx:32`).
-- **Streaks and totals without reading your words** — word counts and streak (checked from today, forgiving a paused yesterday) come from the plaintext index, never from decrypted content (`src/lib/pages.ts:214`, `src/lib/stats.ts:72`).
-- **One-click plaintext backup** — every page exports as a `.zip` of `.md` files plus an index, with a README inside warning the archive is unencrypted and should be stored somewhere private (`src/lib/export.ts:39`).
-- **Bounds enforced in both directions** — titles are clipped to 80 chars (`src/lib/title.ts:12`), slugs must match exactly 8 hex chars (`src/lib/pages.ts:48`), dates must be `YYYY-MM-DD` (`src/lib/pages.ts:70`), line-heights are a fixed preset list, and the home list pages at 17 rows so the footer never scrolls off (`src/components/HomeMain.tsx:28`).
-- **Degrades to a setup screen** — with R2 vars missing the app renders a terminal dialog listing exactly what to add to `.env` instead of crashing (`src/app/(app)/page.tsx:42`).
+- **Vim everywhere** — the journal is a real vim buffer; `:w`, `:q`, `:q!` work, and autosave fires 0.9s after the last keystroke, so a lost entry is nearly impossible. `src/components/VimEditor.tsx:31`
+- **Encrypted at rest** — each entry is AES-256 gpg-encrypted server-side before upload; only metadata is plaintext. `src/lib/crypto.ts:82`
+- **Full-text grep** — `/` searches every entry, decrypting on the fly, and returns a snippet around each match. `src/lib/pages.ts:259`
+- **Calendar view** — `c` opens a `cal`-style month grid navigable with vim keys; `n` writes an entry for any selected day. `src/components/Calendar.tsx:39`
+- **PIN + auto-lock** — an scrypt-hashed PIN (4–64 chars) gates the app; it re-locks after inactivity (default 5 min) or on tab switch. `src/lib/lock.ts:19` `src/lib/lock-client.ts:20`
+- **Optional session gate** — setting `APP_HASH_KEY` puts a login screen on every open, enforced server-side, not just by hiding UI. `src/lib/auth.ts:88`
+- **One-click backup** — downloads a zip of every entry as readable markdown plus an index; plaintext on purpose, so guard it. `src/lib/export.ts:17`
+- **Journal stats** — entries, total words, streak, and today's count, computed from the index without decrypting anything. `src/app/(app)/page.tsx:16`
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  UI[Browser · home list / vim editor / calendar / search] --> API[Next.js API routes + authGuard]
-  API --> PAGES[lib/pages · CRUD + plaintext index.json]
-  PAGES --> CRYPTO[lib/crypto · gpg --symmetric AES-256]
-  PAGES --> R2[lib/r2 · S3 client + in-process read cache]
-  CRYPTO --> R2
-  R2 --> BUCKET[(Cloudflare R2 · index.json / slug.gpg / lock.json)]
-  BUCKET --> R2
+  A[Browser<br/>Vim editor / list / grep] --> B[Next.js server<br/>App Router]
+  B --> C[lib/pages<br/>CRUD + index]
+  C --> D[crypto.ts<br/>gpg AES-256]
+  C --> E[r2.ts<br/>client + read cache]
+  D --> E
+  E --> F[(Cloudflare R2<br/>.gpg blobs + index.json)]
+  F -.index.json.-> C
 ```
 
-Press Enter on an entry in the home list and the browser hits `GET /api/pages/:slug`, which fetches that page's `<slug>.gpg` through the R2 read cache, spawns gpg to decrypt it with `ENC_PASSPHRASE`, merges in the title/date/line-height from the plaintext index, and returns fully decrypted markdown. The Vim editor mounts from that payload; after ~0.9s of quiet typing it `PUT`s the buffer back, the server re-encrypts and writes the blob through the cache, and the index is updated inside a serialized lock so the home screen's title/stats stay current.
+Saving a page runs Vim buffer → `PUT /api/pages/[slug]` → `updatePage` → gpg encrypt → R2; the home list renders straight from the plaintext `index.json`, so browsing and stats never decrypt a single entry.
 
 ## Key technical decisions
 
-### 1. Encryption through a gpg subprocess (security / deploy gotcha)
+### 1. Two-tier state: plaintext index, encrypted blobs (metadata)
 
-Encryption is a spawned `gpg` binary, not a JS crypto library, and the invocation is shaped to survive serverless filesystems.
+**Problem:** Rendering the list, search, and stats meant decrypting every entry.
+**Solution:** `index.json` holds only titles/dates/word counts; `<slug>.gpg` holds content. `src/lib/pages.ts:42`
+**Outcome:** Browsing and stats are decryption-free; content is touched only when a page opens.
 
-**Problem:** `gpg` needs a writable home directory even for symmetric ops, but on hosts like Vercel `$HOME` can point nowhere and only `/tmp` is writable, so a stock call dies with `can't create directory '$HOME/.gnupg'` (`src/lib/crypto.ts:18`). Passing the passphrase as an argv flag would also leak it into the process list.
+### 2. gpg as a subprocess with a scratch homedir (deploy)
 
-**Solution:** a scratch gnupg home is created under the OS temp dir for every invocation and thrown away (`src/lib/crypto.ts:25`), and the passphrase is fed on file descriptor 3 via `--passphrase-fd 3` so it never appears in argv or stdin (`src/lib/crypto.ts:44`).
+**Problem:** AES-256 must work on serverless hosts where `$HOME` doesn't exist and the filesystem is read-only except `/tmp`.
+**Solution:** Spawn `gpg --symmetric` with a scratch homedir under `/tmp`; the passphrase travels on fd 3, never argv or stdin. `src/lib/crypto.ts:26`
+**Outcome:** The same code path runs on local, Render, and Vercel; the key never leaks into process arguments.
 
-**Outcome:** the same code path works on local dev, Render, and Vercel alike, and the secret never shows up in `ps` output.
+### 3. Treating the client as hostile (security)
 
-### 2. A plaintext index beside encrypted blobs (two-tier state)
+**Problem:** UI-only locks are cosmetic; every data route must self-enforce.
+**Solution:** `authGuard()` runs first in every data route; constant-time compares, an HMAC-signed cookie, and 5-fail/15s brute-force throttles. `src/lib/auth.ts:88`
+**Outcome:** A forged cookie or hammered PIN/key cannot read data.
 
-The bucket holds ciphertext `.gpg` files plus one small plaintext `index.json` carrying titles, `updatedAt`, optional dates, and word counts (`src/lib/pages.ts:40`).
+### 4. Process-local read cache on `globalThis` (latency)
 
-**Problem:** rendering the home screen used to require decrypting every file — N gpg spawns and N R2 round trips just to show a list.
+**Problem:** Every action re-reads the same small objects; each R2 round-trip costs 100–300ms and duplicate serial reads dominated latency.
+**Solution:** A TTL-bounded (5s), byte-capped (8MB) cache lives on `globalThis` — shared across Turbopack's per-segment module copies — and writes through on save/delete. `src/lib/r2.ts:39`
+**Outcome:** Serial duplicate reads collapse; staleness across instances is bounded to one TTL.
 
-**Solution:** `listPages`, `totalWords`, and streak math read only the single index object, and decryption happens lazily per page (`src/lib/pages.ts:214`); writes push the encrypted blob first, then update the index.
+### 5. Serialized index writes (correctness)
 
-**Outcome:** the home page renders from one R2 GET, and the simplest possible object is the only plaintext copy of anything.
-
-### 3. Serialized read-modify-write on the index (correctness)
-
-Concurrent saves from two tabs can interleave on `index.json` and silently drop a title, date, or word-count update.
-
-**Problem:** R2 offers no compare-and-swap, so a naive read → mutate → write from two in-flight requests corrupts metadata at journal scale (`src/lib/pages.ts:92`).
-
-**Solution:** every index mutation is chained onto a module-level promise queue through `withIndexLock`, so index writes run strictly one at a time while content blobs still write independently and the queue survives rejected mutations (`src/lib/pages.ts:99`).
-
-**Outcome:** tab A and tab B editing different pages never lose each other's metadata.
-
-### 4. Bounded parallel decryption (throttling)
-
-Search and export must read every page, but doing it serially is slow and doing it without a cap spawns a gpg process storm.
-
-**Problem:** N entries meant N serial R2 round trips plus N gpg spawns, and naive `Promise.all` would fire dozens of subprocesses at once (`src/lib/pages.ts:249`).
-
-**Solution:** `mapLimit` runs at most 4 decrypt jobs concurrently while preserving result order, and both full-text search and zip export route through the same helper (`src/lib/pages.ts:229`, `src/lib/export.ts:25`).
-
-**Outcome:** a large journal decrypts in roughly a quarter of the serial wall time with a flat, predictable sidecar process count.
-
-### 5. The client is hostile (security)
-
-Every API route re-validates what the UI already did, because a browser's calls are not an API contract — and both the PIN and the hash key get server-side brute-force throttles.
-
-**Problem:** content, slugs, dates, and line-heights arrive as untyped JSON; if only the client validated them, a crafted request could write junk keys or probe protected data.
-
-**Solution:** content is type-checked (`src/app/api/pages/[slug]/route.ts:44`), slugs must match `^[a-f0-9]{8}$` (`src/lib/pages.ts:48`), dates must be `YYYY-MM-DD` (`src/lib/pages.ts:70`), line-heights must be one of five presets (`src/lib/line-height.ts:19`), and the optional session gate is enforced by `authGuard()` at the top of every data route rather than by hiding UI (`src/lib/auth.ts:88`); wrong PIN and wrong key both trip a 15s lockout after 5 attempts.
-
-**Outcome:** a hand-crafted request gets a 400 or 401 and can neither create, read, modify, nor delete anything it shouldn't.
-
-### 6. Version baked at build time, three fallbacks deep (deploy gotcha)
-
-The version label next to the logo is resolved when the code compiles, not when it runs.
-
-**Problem:** Render and Docker build images ship without `.git` or tags, where `git describe` fails; a naive `--always` flag silently exited 0 with a bare commit SHA, which would have surfaced as the UI version (`next.config.ts:17`).
-
-**Solution:** an explicit `NEXT_PUBLIC_APP_VERSION` wins first, then the nearest git tag, then `package.json` version, then `dev` — with `--always` deliberately omitted so a tag-less repo fails loudly and falls through (`next.config.ts:23`).
-
-**Outcome:** the label is constant per build, and a build environment with no git history still shows a sane `v1.2.2`-style version.
+**Problem:** Concurrent saves from two tabs could interleave read-modify-write cycles and drop a title/date/word update.
+**Solution:** A promise-queue lock serializes every mutation of `index.json`; content blobs stay independent. `src/lib/pages.ts:99`
+**Outcome:** No lost metadata updates under concurrency.
 
 ## Run locally
 
-Requirements: **Node 20+** and a **gpg 2.x binary on PATH** (gpg is spawned for every encrypt/decrypt — `src/lib/crypto.ts:37`).
+Requires Node 20.9+ (Next.js 16 engine) and the `gpg` binary.
 
 ```bash
+cp .env.example .env   # fill in R2_* and ENC_PASSPHRASE
 npm install
-cp .env.example .env        # then fill in R2_* + ENC_PASSPHRASE
-npm run dev                 # http://localhost:3000
+npm run dev
 ```
 
-No R2 account yet? Run against the bundled in-memory S3 mock — zero config:
+Production: `npm run build && npm start`. Lint: `npm run lint`.
 
-```bash
-node scripts/mock-r2.mjs &  # in-memory S3 server on :9099
-R2_ENDPOINT=http://127.0.0.1:9099 R2_ACCOUNT_ID=local R2_ACCESS_KEY_ID=test \
-R2_SECRET_ACCESS_KEY=test R2_BUCKET_NAME=test-bucket ENC_PASSPHRASE=whatever npm run dev
-```
-
-Production build and start:
-
-```bash
-npm run build && npm start
-```
-
-Lint: `npm run lint`.
+No R2 credentials yet? The app still boots — it shows a "storage not configured" screen (`src/app/(app)/page.tsx:42`). For offline dev, point `R2_ENDPOINT` at the in-memory mock instead: `node scripts/mock-r2.mjs`.
 
 ## Configuration
 
 | Env var | Required | Effects when set |
-| --- | --- | --- |
-| `R2_ACCOUNT_ID` | ✅ | The S3 endpoint is built from it (`https://<id>.r2.cloudflarestorage.com`). Unset → the app prints the storage-not-configured screen (`src/lib/r2.ts:71`) |
-| `R2_ACCESS_KEY_ID` | ✅ | S3 credential for the bucket. Unset → storage not configured |
-| `R2_SECRET_ACCESS_KEY` | ✅ | S3 credential for the bucket. Unset → storage not configured |
-| `R2_BUCKET_NAME` | ✅ | Bucket holding `index.json`, `<slug>.gpg`, and `lock.json`. Unset → storage not configured |
-| `ENC_PASSPHRASE` | ✅ | Secret for every gpg AES-256 encrypt/decrypt. Unset → storage not configured; a wrong passphrase shows a clear "could not decrypt this page" screen (`src/app/(app)/pages/[slug]/page.tsx:24`) |
-| `R2_FOLDER` | — | Prefixes all objects with `<folder>/`. Unset → objects live at the bucket root (`src/lib/r2.ts:96`) |
-| `APP_HASH_KEY` | — | Enables the per-session hash-key gate and signed httpOnly cookie. Unset → the gate is disabled and the app opens directly (`src/lib/auth.ts:16`) |
-| `R2_ENDPOINT` | — | Points the S3 client at a local mock instead of real R2 and forces path-style requests. Unset → real Cloudflare endpoint (`src/lib/r2.ts:104`) |
-| `NEXT_PUBLIC_APP_VERSION` | — | Pins the version label shown next to the logo. Unset → resolved at build time as env → git tag → package.json version → `dev` (`next.config.ts:14`) |
+|---|---|---|
+| `R2_ACCOUNT_ID` | ✅ | R2 endpoint host; unset → storage not configured. |
+| `R2_ACCESS_KEY_ID` | ✅ | S3 credentials for R2. |
+| `R2_SECRET_ACCESS_KEY` | ✅ | S3 credentials for R2. |
+| `R2_BUCKET_NAME` | ✅ | Bucket all objects live in. |
+| `ENC_PASSPHRASE` | ✅ | AES-256 key for every page; unset → gpg calls throw. |
+| `R2_FOLDER` | — | Prefixes all objects under `<folder>/`; unset = bucket root. |
+| `R2_ENDPOINT` | — | Switches to a local S3-compatible mock; unset = `*.r2.cloudflarestorage.com`. |
+| `APP_HASH_KEY` | — | Enables the session gate; unset = gate skipped. |
+| `NEXT_PUBLIC_APP_VERSION` | — | Pins the version label; unset = git tag → package.json → "dev". |
 
 ## Project structure
 
 ```
-fanaa/
-├─ src/app/           # Routes — home, search, pages/[slug], and the /api/* handlers
-├─ src/components/    # Terminal UI — vim editor, lock screens, home list, calendar
-├─ src/lib/           # Core — pages CRUD, gpg crypto, R2 client, auth, lock, stats
-├─ scripts/           # mock-r2.mjs — in-memory S3 server for local testing
-├─ next.config.ts     # Security headers + version baked in at build time
-├─ .env.example       # Documented template for every env var the app reads
-└─ package.json       # Next 16 + React 19; dev / build / start / lint scripts
+Fanaa/
+├─ src/app/(app)/                # home, editor, search pages
+├─ src/app/api/                  # auth / lock / pages / export routes
+├─ src/app/layout.tsx            # root gate: session → lock → app
+├─ src/lib/pages.ts              # index + page CRUD, search
+├─ src/lib/r2.ts                 # R2 client + read cache
+├─ src/lib/crypto.ts             # gpg AES-256 encrypt/decrypt
+├─ src/lib/auth.ts               # hash-key session gate
+├─ src/lib/lock.ts               # scrypt PIN store
+├─ src/components/VimEditor.tsx  # CodeMirror + vim buffer
+└─ scripts/mock-r2.mjs           # local S3-compatible mock
 ```
 
 ---
-
-Write it, lock it, vanish — the words stay yours even when they leave your hands.
-
+Keep writing — every word here disappears into the dark.
 ---
 
 <div align="left">
